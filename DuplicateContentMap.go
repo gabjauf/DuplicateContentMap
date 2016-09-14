@@ -1,14 +1,14 @@
 package main
 
 import (
-    "strconv"
+    "flag"
 	"fmt"
     "time"
 	"log"
     "strings"
     "math/rand"
-    "os"
 	"github.com/PuerkitoBio/goquery"
+    //"encoding/csv"
 )
 
 type page struct {
@@ -104,18 +104,16 @@ func StringSliceCompareFull(slice1 []string, slice2 []string) bool {
 }
 
 func main() {
-    rand.Seed(time.Now().UTC().UnixNano())
-    args := os.Args[2:]
-    k, err := strconv.Atoi(os.Args[1])
-    if err != nil {
-        log.Fatal(err)
-    }
+    rand.Seed(time.Now().UTC().UnixNano()) // initiate the seed for the random function
+    k := flag.Int("k", 3, "The value of k, which defines the length of the k-shingles")
+    flag.Parse()
+    args := flag.Args()
     pages := make([]page, len(args))
 
     for url := range args {
         fmt.Printf("=================== FETCHING %s  =================\n", args[url])
         pages[url].url = args[url]
-        pages[url].shingles = pages[url].Scrape(args[url], k)
+        pages[url].shingles = pages[url].Scrape(args[url], *k)
         //pages[url].PrettyPrint()
         fmt.Println("")
         fmt.Printf("========== END of url %s ===========\n", args[url])
@@ -124,16 +122,12 @@ func main() {
     
     buf := make([]float64, len(pages))
     for i := 0; i < len(pages); i ++ {
-        //pages[0].PrettyPrint()
-
-        //pages[1].PrettyPrint()
         for j := 0; j < len(pages); j++ {
 
-            //pages[0].PrettyPrint()
             buf[j] = evaluate(pages[i].shingles, pages[j].shingles)
-            //pages[0].PrettyPrint()
-            fmt.Printf("%f ", buf[j])
+            fmt.Printf("%f\t", buf[j])
         }
-        fmt.Printf("\n")
+        fmt.Printf("\t: %v.\t%v\n", i,  pages[i].url)
     }
+    fmt.Printf("k = %v\n", *k)
 }
