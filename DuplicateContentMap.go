@@ -17,18 +17,18 @@ type page struct {
 }
 
 // Scrape content in url "url" with defined shingle length k
-func (page *page) Scrape(url string, k int) {
+func (page *page) Scrape(url string, k int) [][]string {
     doc, err := goquery.NewDocument(url) 
     if err != nil {
         log.Fatal(err)
     }
 
+    result := make([][]string, 200)
     // Find the review items
     doc.Each(func(i int, s *goquery.Selection) {
         // Get only the paragraphs "p"
         content := s.Find("p").Text()
         tokens := strings.Fields(content)
-        result := make([][]string, 200)
         for shingle := range result { 
             result[shingle] = make([]string, k)
             index := rand.Intn(len(tokens) - k)
@@ -38,6 +38,7 @@ func (page *page) Scrape(url string, k int) {
         }
         page.shingles = result
     })
+    return result
 
 }
 
@@ -47,19 +48,38 @@ func (page *page) PrettyPrint() {
     }
 }
 
-func evaluate(page1 page, page2 page) int {
-    result := 0
-    for shingle1 := range page1.shingles {
-        for shingle2 := range page2.shingles {
-            if StringSliceCompare(page1.shingles[shingle1], page2.shingles[shingle2]) == true {
-                result += 1
+func evaluate(shingles1 [][]string, shingles2 [][]string) float64 {
+    intersect := make([][]string, 0)
+    union := make([][]string, 0)
+    for shingle1 := range shingles1 {
+        for shingle2 := range shingles2 {
+            if StringSliceCompare(shingles1[shingle1], shingles2[shingle2]) == true {
+                intersect = AppendIfMissing(intersect, shingles1[shingle1])
+                union = AppendIfMissing(union, shingles1[shingle1])
                 //fmt.Println(page1.shingles[shingle1], page2.shingles[shingle2])
+                break
+            } else {
+                union = AppendIfMissing(union, shingles1[shingle1])
+               union = AppendIfMissing(union, shingles2[shingle2])
             }
         }
     }
-    return result
+    //fmt.Println()
+    //fmt.Println("Union",len(union))
+    //fmt.Println("intersect", len(intersect))
+    return float64(len(intersect)) / float64(len(union))
     
 }
+
+func AppendIfMissing(slice [][]string, elt []string) [][]string {
+    for ele := range slice {
+        if StringSliceCompare(slice[ele], elt) {
+            return slice
+        }
+    }
+    return append(slice, elt)
+}
+
 
 // Compare two slices of string of same size same index
 func StringSliceCompare(slice1 []string, slice2 []string) bool {
@@ -95,11 +115,25 @@ func main() {
     for url := range args {
         fmt.Printf("=================== FETCHING %s  =================\n", args[url])
         pages[url].url = args[url]
-        pages[url].Scrape(args[url], k)
+        pages[url].shingles = pages[url].Scrape(args[url], k)
         //pages[url].PrettyPrint()
         fmt.Println("")
         fmt.Printf("========== END of url %s ===========\n", args[url])
         fmt.Println("")
     }
-    fmt.Println("duplicate content:", evaluate(pages[0], pages[1]))
+    
+    buf := make([]float64, len(pages))
+    for i := 0; i < len(pages); i ++ {
+        //pages[0].PrettyPrint()
+
+        //pages[1].PrettyPrint()
+        for j := 0; j < len(pages); j++ {
+
+            //pages[0].PrettyPrint()
+            buf[j] = evaluate(pages[i].shingles, pages[j].shingles)
+            //pages[0].PrettyPrint()
+            fmt.Printf("%f ", buf[j])
+        }
+        fmt.Printf("\n")
+    }
 }
