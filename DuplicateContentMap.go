@@ -1,6 +1,7 @@
 package main
 
 import (
+    "os"
     "flag"
 	"fmt"
     "time"
@@ -8,7 +9,8 @@ import (
     "strings"
     "math/rand"
 	"github.com/PuerkitoBio/goquery"
-    //"encoding/csv"
+    "encoding/csv"
+    "strconv"
 )
 
 type page struct {
@@ -103,9 +105,27 @@ func StringSliceCompareFull(slice1 []string, slice2 []string) bool {
     return true
 }
 
+func ExportFormat(pages []page) [][]string {
+    result := make([][]string, len(pages) + 1)
+    for url := range pages {
+        result[url] = make([]string, len(pages))
+        result[0][url] = pages[url].url
+    }
+    result[len(result) - 1] = make([]string, len(pages))
+    for i := range pages {
+        for j := range pages {
+            result[i + 1][j] = strconv.FormatFloat(evaluate(pages[i].shingles, pages[j].shingles), 'f', -1, 64)
+        }
+    }
+    return result
+}
+
+
+
 func main() {
     rand.Seed(time.Now().UTC().UnixNano()) // initiate the seed for the random function
     k := flag.Int("k", 3, "The value of k, which defines the length of the k-shingles")
+    exportFormat := flag.String("ExportFormat", "cmd", "Defines the type of export format expected. Choice between cmd, csv and pdf")
     flag.Parse()
     args := flag.Args()
     pages := make([]page, len(args))
@@ -116,18 +136,35 @@ func main() {
         pages[url].shingles = pages[url].Scrape(args[url], *k)
         //pages[url].PrettyPrint()
         fmt.Println("")
-        fmt.Printf("========== END of url %s ===========\n", args[url])
+        fmt.Printf("=================== END of url %s ================\n", args[url])
         fmt.Println("")
     }
-    
-    buf := make([]float64, len(pages))
-    for i := 0; i < len(pages); i ++ {
-        for j := 0; j < len(pages); j++ {
-
-            buf[j] = evaluate(pages[i].shingles, pages[j].shingles)
-            fmt.Printf("%f\t", buf[j])
+    matrix := ExportFormat(pages)
+    switch *exportFormat {
+    case "csv":
+        file, err := os.Create("DuplicateContentMatrix.csv")
+        if err != nil {
+            log.Fatal("Cannot create CSV file", err)
         }
-        fmt.Printf("\t: %v.\t%v\n", i,  pages[i].url)
+        defer file.Close()
+        writer := csv.NewWriter(file)
+        for _, value := range matrix {
+            if err := writer.Write(value); err != nil {
+                log.Fatal("Error during writing", err)
+            }
+        }
+        defer writer.Flush()
+
+    case "pdf":
+        fmt.Println("TO DO")
+
+    default:
+        for i := range matrix {
+            for j := range matrix[i] {
+                fmt.Printf("%s\t", matrix[i][j])
+            }
+            fmt.Printf("\n")
+        }
     }
-    fmt.Printf("k = %v\n", *k)
 }
+
